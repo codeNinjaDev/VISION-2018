@@ -4,15 +4,21 @@ import cv2
 import numpy as np
 import math
 cap = cv2.VideoCapture(0)
-FOV = 55.794542
-FOCAL_LENGTH = 808
-MARGIN_OF_ERROR = 20
+#Calculated by hand
+ANGLE_OF_LAUNCH = 45
+GRAVITY_INCHES = 386
+HFOV = 55.794542
+VFOV = 50.92
+RADIUS_OF_FLYWHEEL = 4
+#Calculated in program
+H_FOCAL_LENGTH = 808
+V_FOCAL_LENGTH = 707
 
-counter = 0
-camera_matrix =np.ndarray((3,3), buffer=np.array([[517.2110395316563, 0.0, 334.3418325883858], [0.0, 543.2949569504035, 211.75050568262293], [0.0, 0.0, 1.0]])) # offset = 1*itemsize, i.e. skip first element
+
+#camera_matrix =np.ndarray((3,3), buffer=np.array([[517.2110395316563, 0.0, 334.3418325883858], [0.0, 543.2949569504035, 211.75050568262293], [0.0, 0.0, 1.0]])) # offset = 1*itemsize, i.e. skip first element
+#dist =np.ndarray((1,5), buffer=np.array([[0.07251015712570133, -0.7601727484403693, -0.02290637861280213, 0.01562729685105215, 2.5647585221601936]])) # offset = 1*itemsize, i.e. skip first element
 
 
-dist =np.ndarray((1,5), buffer=np.array([[0.07251015712570133, -0.7601727484403693, -0.02290637861280213, 0.01562729685105215, 2.5647585221601936]])) # offset = 1*itemsize, i.e. skip first element
 # Masks the video based on a range of hsv colors
 # Takes in a frame, returns a masked frame
 def threshold_video(frame):
@@ -21,19 +27,19 @@ def threshold_video(frame):
     #Gets center of height and width
     centerX = (screenWidth / 2) - .5
     centerY = (screenHeight / 2) - .5
-    #Blurs video to smooth out image
     blur = cv2.medianBlur(frame, 5)
 
     # Convert BGR to HSV
     hsv = cv2.cvtColor(blur, cv2.COLOR_BGR2HSV)
-    # define range of color in HSV
-    lower_color = np.array([152, 163, 0])
+    # define range of blue (my current shirt) in HSV
+    lower_color = np.array([0, 126, 76])
     upper_color = np.array([180, 255, 255])
     # hold the HSV image to get only red colors
     mask = cv2.inRange(hsv, lower_color, upper_color)
     # Shows the theshold image in a new window
     cv2.imshow('threshold', mask)
-    # Returns the masked image
+    # Returns the masked imageBlurs video to smooth out image
+
     return mask
 
 #Finds the contours from the masked image and displays them on original stream
@@ -99,14 +105,16 @@ def processContours(contours, image, centerX, centerY):
             else:
                 smaller_side = width
             #Calculates yaw of contour (horizontal position in degrees)
-            yaw = calculateYaw(cx, centerX, FOCAL_LENGTH)
+            yaw = calculateYaw(cx, centerX, H_FOCAL_LENGTH)
             #Calculates yaw of contour (horizontal position in degrees)
-            pitch = calculatePitch(cy, centerY, FOCAL_LENGTH)
+            pitch = calculatePitch(cy, centerY, V_FOCAL_LENGTH)
+            #
             #Adds padding for text
             padding  = -8 - math.ceil(.5*smaller_side)
             #Draws rotated rectangle
             #cv2.drawContours(image, [box], 0, (23, 184, 80), 3)
-
+            distance = calculateDistance(10.25, 8.5, pitch);
+            velocity = calculateShooterVelocity(distance)
             #Draws a vertical white line passing through center of contour
             cv2.line(image, (cx, screenHeight), (cx, 0), (255, 255, 255))
             #Draws a white circle at center of contour
@@ -117,6 +125,9 @@ def processContours(contours, image, centerX, centerY):
             cv2.putText(image, "Yaw: " + str(yaw), (cx+ 40, cy + padding -16), cv2.FONT_HERSHEY_COMPLEX, .6, (255, 255, 255))
             #Puts the Pitch on screen
             cv2.putText(image, "Pitch: " + str(pitch), (cx+ 80, cy + padding -42), cv2.FONT_HERSHEY_COMPLEX, .6, (255, 255, 255))
+            cv2.putText(image, "Distance: " + str(distance), (cx+ 80, cy + padding -60), cv2.FONT_HERSHEY_COMPLEX, .6, (255, 255, 255))
+            cv2.putText(image, "Velocity: " + str(velocity), (cx+ 80, cy + padding -84), cv2.FONT_HERSHEY_COMPLEX, .6, (255, 255, 255))
+
             #Draws the convex hull
             #cv2.drawContours(image, [hull], 0, (23, 184, 80), 3)
             #Draws the contours
@@ -172,19 +183,34 @@ def translateRotation(rotation, width, height):
         rotation = -1 * (rotation - 180)
     rotation *= -1
     return rotation
+def calculateDistance(heightOfCamera, heightOfTarget, pitch):
+    heightOfCameraFromTarget = heightOfTarget - heightOfCamera
+    if heightOfCameraFromTarget < 0:
+        heightOfCameraFromTarget
+    #Uses trig and pitch to find distance to target
+    distance = math.fabs(heightOfCameraFromTarget / math.tan(math.radians(pitch)))
 
+    return distance
 #Uses trig and focal length of camera to find yaw.
 #Link to further explanation: https://docs.google.com/presentation/d/1ediRsI-oR3-kwawFJZ34_ZTlQS2SDBLjZasjzZ-eXbQ/pub?start=false&loop=false&slide=id.g12c083cffa_0_298
-def calculateYaw(pixelX, centerX, focalLength):
-    yaw = math.degrees(math.atan((pixelX - centerX) / focalLength))
+def calculateYaw(pixelX, centerX, hFocalLength):
+    yaw = math.degrees(math.atan((pixelX - centerX) / hFocalLength))
     return yaw
-#Uses trig and focal length of camera to find pitch
 #Link to further explanation: https://docs.google.com/presentation/d/1ediRsI-oR3-kwawFJZ34_ZTlQS2SDBLjZasjzZ-eXbQ/pub?start=false&loop=false&slide=id.g12c083cffa_0_298
-def calculatePitch(pixelY, centerY, focalLength):
-    pitch = math.degrees(math.atan((pixelY - centerY) / focalLength))
+def calculatePitch(pixelY, centerY, vFocalLength):
+    pitch = math.degrees(math.atan((pixelY - centerY) / vFocalLength))
     #Just stopped working have to do this:
     pitch *= -1
     return pitch
+def calculateShooterVelocity(distance):
+    linear_velocity = math.fabs(math.sqrt((distance * GRAVITY_INCHES) / math.sin(math.radians(2 * ANGLE_OF_LAUNCH))))
+    print("Linear Velocity: " + str(linear_velocity))
+    angular_velocity = (linear_velocity / RADIUS_OF_FLYWHEEL)
+    revolution = 2 * math.pi
+    rpm = angular_velocity * (60 / revolution)
+    print("RPM: " + str(rpm))
+
+    return rpm
 while(True):
 
     _, frame = cap.read()
@@ -192,12 +218,16 @@ while(True):
     screenHeight, screenWidth, channels = frame.shape
     print("Screen width" + str(screenWidth))
     #Calculates focal Length-
-    focalLength = screenWidth / (2 * math.tan(FOV/2))
+    focalLength = screenWidth / (2 * math.tan(HFOV/2))
     print("Focal Length " + str(focalLength))
+    print("Vertical Focal Length " + str(screenHeight / (2 * math.tan(VFOV/2))))
+
     threshold = threshold_video(frame)
     findContours(cap, threshold)
     blank_image = np.zeros((screenHeight, screenWidth, 3), np.uint8)
     findContoursNewImage(cap, threshold, blank_image)
+    cv2.imshow("Frame", frame)
+    #press escape to exit program
     k = cv2.waitKey(5) & 0xFF
     if k == 27:
         break
