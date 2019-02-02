@@ -2,12 +2,13 @@ import cv2
 import numpy as np
 
 cap = cv2.VideoCapture(0)
-
+MARGIN_OF_ERROR = 20
 # while(True):
 # Take each frame
-img = cv2.imread('../1ftH1ftD0Angle0Brightness.jpg', 1)
+img = cv2.imread('../1ftH3ftD0Angle0Brightness.jpg', 1)
 blur = cv2.medianBlur(img, 5)
-
+screenHeight, screenWidth, channels = img.shape
+midX = screenWidth / 2
 # Convert BGR to HSV
 hsv = cv2.cvtColor(blur, cv2.COLOR_BGR2HSV)
 # define range of blue color in HSV
@@ -100,7 +101,17 @@ if len(contours) > 0:
     print("Box Ratio = " + str((blueBoundingBox + redBoundingBox) / boundingBox))
     print("Midpoint is (" + str(centerX) + ", " + str(centerY) + ")")
     #print("Contour Ratio = " + str((biggest_contour + next_biggest_contour) / boundingBox))
+    cv2.line(res, (round(screenWidth/2), 0), (round(screenWidth/2), screenHeight), (255, 255, 255), 3, 8, 0)
+    enclosed = (((centerX - (screenWidth / 2))**(2))/((MARGIN_OF_ERROR)**2)) + (((centerY - (screenHeight / 2))**(2))/((screenHeight)**2))
+    if enclosed <= 1:
+        print("enclosed")
+    elif centerX > midX:
+        print(str(centerX - midX) + " to the right (px)")
+    else:
+        print(str(midX - centerX) + " to the left (px)")
 
+    # (x−h)2r2x+(y−k)2r2y≤1 Finding if point is in ellipse, probably could just do lines, but whatever
+cv2.ellipse(res, (round(screenWidth / 2), round(screenHeight/2)), (MARGIN_OF_ERROR, screenHeight),0, 0, 360, (255, 255, 255), 3, 8)
 cv2.imshow('img', img)
 cv2.imshow('blur', blur)
 cv2.imshow('mask', mask)

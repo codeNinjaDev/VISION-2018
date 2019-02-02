@@ -101,6 +101,11 @@ def findContours(frame, mask):
     # Shows the contours overlayed on the original video
     return image
 
+width_center_of_tape = 5;
+yawFromContour = calculateYaw(x, centerX, H_FOCAL_LENGTH);
+tan yaw = width_center_of_tape / calculateDistance()
+distance = width_center_of_tape / tan_yaw
+
 
 # Draws and calculates properties of largest contours ###### USED #####
 def processLargestContours(contours, image, centerX, centerY):
@@ -222,9 +227,8 @@ def processLargestContours(contours, image, centerX, centerY):
                 if (tilt2 < 0):
                     if (cx2 < cx1):
                         continue
-                centerXOfImage = screenWidth / 2
                 # pixelDistanceOfTargetToCenter = round(math.fabs(centerXOfImage - centerOfTarget))
-                yawToTarget = calculateYaw(centerOfTarget, centerXOfImage, H_FOCAL_LENGTH)
+                yawToTarget = calculateYaw(centerOfTarget, centerX, H_FOCAL_LENGTH)
                 if [centerOfTarget, yawToTarget] not in targets:
                     targets.append([centerOfTarget, yawToTarget])
 
